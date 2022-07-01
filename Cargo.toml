@@ -1,0 +1,10 @@
+[package]
+name = "inf8775_tp3_rs"
+version = "0.1.0"
+edition = "2021"
+authors = ["Thomas Laferrière 't.laferriere@pm.me"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = {version = "*", features = ["derive"]}
