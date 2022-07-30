@@ -1,8 +1,10 @@
-use clap::{AppSettings, Parser};
-use std::fmt::Display;
 use std::fs::File;
 use std::io;
-use std::io::{BufRead, Read};
+use std::io::BufRead;
+use std::string::String;
+
+use clap::Parser;
+use itertools::Itertools;
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -15,40 +17,8 @@ struct Cli {
 
 fn main() {
     let cli = Cli::parse();
-    let (t, nAtoms, h, edges) = match read_prob(cli.example) {
-        Ok(x) => x,
-        Err(e) => {
-            println!("{}", e);
-            return;
-        }
-    };
-}
-
-#[derive(Debug, Clone)]
-struct ReadError {
-    msg: String,
-}
-
-impl Display for ReadError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Error reading problem definition: {}", self.msg)
-    }
-}
-
-impl From<io::Error> for ReadError {
-    fn from(err: io::Error) -> Self {
-        ReadError {
-            msg: err.to_string(),
-        }
-    }
-}
-
-impl From<std::num::ParseIntError> for ReadError {
-    fn from(err: std::num::ParseIntError) -> Self {
-        ReadError {
-            msg: err.to_string(),
-        }
-    }
+    let (t, n_atoms, h, edges) = read_prob(cli.example);
+    println!("t = {t}, n_atoms = {n_atoms:?}, h = {h:?}, edges = {edges:#?}")
 }
 
 /// Read problem description
@@ -63,84 +33,79 @@ impl From<std::num::ParseIntError> for ReadError {
 /// * H: energy of each atom combination. shape = k x k in a contiguous vector
 /// * edges: available edges of target graph. shape = A x 2
 /// The error type is ReadError
-fn read_prob(path: String) -> Result<(usize, Vec<u32>, Vec<i32>, Vec<(usize, usize)>), ReadError> {
-    let file = File::open(&path)?;
-    let mut lines = io::BufReader::new(file).lines();
-    let (t, k, a) = if let Some(Ok(l)) = &lines.next() {
-        let mut nums = l.splitn(3, ' ');
-        (
-            nums.next().unwrap().parse::<usize>()?,
-            nums.next().unwrap().parse::<usize>()?,
-            nums.next().unwrap().parse::<usize>()?,
-        )
-    } else {
-        return Err(ReadError {
-            msg: format!("file is empty: {}", path),
-        });
-    };
-
-    let mut n_atoms = vec![0; k];
-    let mut lines = lines.skip_while(|line| {
-        if let Ok(li) = line {
-            li.is_empty()
-        } else {
-            false
-        }
-    });
-    if let Some(Ok(l)) = lines.next() {
-        l.splitn(k, ' ').map(|s| s.parse::<u32>())
-    } else {
-        return Err(ReadError {
-            msg: format!("unexpected end of file after reading t, k, a: {}", path),
-        });
-    };
-
-    let mut h = vec![0; k * k];
-    let mut last_idx: (usize, usize) = (0, 0);
-    let mut lines = lines.skip_while(|line| {
-        if let Ok(li) = line {
-            li.is_empty()
-        } else {
-            false
-        }
-    });
-    for (i, l) in lines.take(k).enumerate() {
-        for (j, s) in l?.splitn(k, ' ').enumerate() {
-            h[i * k + j] = s.parse()?;
-            last_idx = (i, j);
-        }
-    }
-
-    if last_idx != (k - 1, k - 1) {
-        return Err(ReadError {
-            msg: format!(
-                "unexpected end of file while reading H: at line {}, column {}, in file: {}",
-                last_idx.0, last_idx.1, path
-            ),
-        });
-    }
-
-    let mut edges = vec![(0, 0); a];
-    let mut last_idx: (usize, usize) = (0, 0);
-    for (i, l) in lines
-        .skip_while(|l| l.is_ok() && l.unwrap().is_empty())
-        .take(k)
+fn read_prob(path: String) -> (usize, Vec<u32>, Vec<i32>, Vec<(usize, usize)>) {
+    let file = File::open(&path).expect("Could not open file.");
+    let mut lines = io::BufReader::new(file)
+        .lines()
         .enumerate()
-    {
-        for (j, s) in l?.splitn(k, ' ').enumerate() {
-            h[i * k + j] = s.parse()?;
-            last_idx = (i, j);
-        }
-    }
+        .map(|(n, line)| (n, line.expect(&format!("Error reading file at line {n}."))))
+        .filter(|(_, line)| !line.is_empty());
+    let (line_no, current_line) = lines.next().expect("File is empty.");
+    let mut nums = current_line.splitn(3, ' ');
+    let t = nums
+        .next()
+        .expect(&format!("t is missing at line {line_no}."))
+        .parse::<usize>()
+        .expect(&format!("Could not parse t at line {line_no}."));
+    let k = nums
+        .next()
+        .expect(&format!("k is missing at line {line_no}."))
+        .parse::<usize>()
+        .expect(&format!("Could not parse k at line {line_no}."));
+    let a = nums
+        .next()
+        .expect(&format!("a is missing at line {line_no}."))
+        .parse::<usize>()
+        .expect(&format!("Could not parse a at line {line_no}."));
 
-    if last_idx != (k - 1, k - 1) {
-        return Err(ReadError {
-            msg: format!(
-                "unexpected end of file while reading H: at line {}, column {}, in file: {}",
-                last_idx.0, last_idx.1, path
-            ),
-        });
-    }
+    // let empty_line = |(n, cur_line): &(usize, io::Result<String>)| {
+    //     let line: &str = cur_line
+    //         .borrow();
+    //     line.is_empty()
+    // };
+    let (line_no, current_line) = lines
+        .next()
+        .expect(&format!("Unexpected end of file after line {line_no}"));
+    let n_atoms = current_line
+        .splitn(k, ' ')
+        .map(|s| {
+            s.parse::<u32>().expect(&format!(
+                "Unable to parse number of atoms at line {line_no}"
+            ))
+        })
+        .collect();
 
-    Ok((t, n_atoms, h, edges))
+    let (to_take, mut lines) = lines.tee();
+    let (line_no, current_line) = to_take
+        .take(k)
+        .reduce(|(_, acc), (n, line)| (n, format!("{acc} {line}")))
+        .expect(&format!("h not found at line {line_no}"));
+    let h = current_line
+        .splitn(k * k, ' ')
+        .map(|s| {
+            s.parse::<i32>()
+                .expect(&format!("Unable to read an energy at line {line_no}."))
+        })
+        .collect();
+    // Advance the iterator because take doesn't mutate it.
+    _ = lines.nth(k - 1);
+
+    let mut edges = lines
+        .take(a)
+        .map(|(line_no, current_line)| {
+            let mut nums = current_line.splitn(2, " ");
+            (
+                nums.next()
+                    .expect(&format!("Node missing at line {line_no}"))
+                    .parse::<usize>()
+                    .expect(&format!("Unable to parse node at line {line_no}")),
+                nums.next()
+                    .expect(&format!("Node missing at line {line_no}"))
+                    .parse::<usize>()
+                    .expect(&format!("Unable to parse node at line {line_no}")),
+            )
+        })
+        .collect();
+
+    (t, n_atoms, h, edges)
 }
