@@ -1,6 +1,8 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io;
 use std::io::BufRead;
+use std::iter::zip;
 use std::string::String;
 
 use clap::Parser;
@@ -19,6 +21,13 @@ fn main() {
     let cli = Cli::parse();
     let (t, n_atoms, h, edges) = read_prob(cli.example);
     println!("t = {t}, n_atoms = {n_atoms:?}, h = {h:?}, edges = {edges:#?}")
+    // let mut graph = vec![vec![]; t];
+    // for (n1, n2) in edges {
+    //     let connected_nodes = &mut graph[n1];
+    //     connected_nodes.push(n2);
+    // }
+    // let mut init_sol: Vec<Option<usize>> = vec![None; t];
+    // for (atom, node) in zip(init_sol, graph) {}
 }
 
 /// Read problem description
@@ -44,19 +53,19 @@ fn read_prob(path: String) -> (usize, Vec<u32>, Vec<i32>, Vec<(usize, usize)>) {
     let mut nums = current_line.splitn(3, ' ');
     let t = nums
         .next()
-        .expect(&format!("t is missing at line {line_no}."))
+        .unwrap_or_else(|| panic!("t is missing at line {line_no}."))
         .parse::<usize>()
-        .expect(&format!("Could not parse t at line {line_no}."));
+        .unwrap_or_else(|_| panic!("Could not parse t at line {line_no}."));
     let k = nums
         .next()
-        .expect(&format!("k is missing at line {line_no}."))
+        .unwrap_or_else(|| panic!("k is missing at line {line_no}."))
         .parse::<usize>()
-        .expect(&format!("Could not parse k at line {line_no}."));
+        .unwrap_or_else(|_| panic!("Could not parse k at line {line_no}."));
     let a = nums
         .next()
-        .expect(&format!("a is missing at line {line_no}."))
+        .unwrap_or_else(|| panic!("a is missing at line {line_no}."))
         .parse::<usize>()
-        .expect(&format!("Could not parse a at line {line_no}."));
+        .unwrap_or_else(|_| panic!("Could not parse a at line {line_no}."));
 
     // let empty_line = |(n, cur_line): &(usize, io::Result<String>)| {
     //     let line: &str = cur_line
@@ -65,13 +74,12 @@ fn read_prob(path: String) -> (usize, Vec<u32>, Vec<i32>, Vec<(usize, usize)>) {
     // };
     let (line_no, current_line) = lines
         .next()
-        .expect(&format!("Unexpected end of file after line {line_no}"));
+        .unwrap_or_else(|| panic!("Unexpected end of file after line {line_no}"));
     let n_atoms = current_line
         .splitn(k, ' ')
         .map(|s| {
-            s.parse::<u32>().expect(&format!(
-                "Unable to parse number of atoms at line {line_no}"
-            ))
+            s.parse::<u32>()
+                .unwrap_or_else(|_| panic!("Unable to parse number of atoms at line {line_no}"))
         })
         .collect();
 
@@ -79,30 +87,30 @@ fn read_prob(path: String) -> (usize, Vec<u32>, Vec<i32>, Vec<(usize, usize)>) {
     let (line_no, current_line) = to_take
         .take(k)
         .reduce(|(_, acc), (n, line)| (n, format!("{acc} {line}")))
-        .expect(&format!("h not found at line {line_no}"));
+        .unwrap_or_else(|| panic!("h not found at line {line_no}"));
     let h = current_line
         .splitn(k * k, ' ')
         .map(|s| {
             s.parse::<i32>()
-                .expect(&format!("Unable to read an energy at line {line_no}."))
+                .unwrap_or_else(|_| panic!("Unable to read an energy at line {line_no}."))
         })
         .collect();
     // Advance the iterator because take doesn't mutate it.
     _ = lines.nth(k - 1);
 
-    let mut edges = lines
+    let edges = lines
         .take(a)
         .map(|(line_no, current_line)| {
             let mut nums = current_line.splitn(2, " ");
             (
                 nums.next()
-                    .expect(&format!("Node missing at line {line_no}"))
+                    .unwrap_or_else(|| panic!("Node missing at line {line_no}"))
                     .parse::<usize>()
-                    .expect(&format!("Unable to parse node at line {line_no}")),
+                    .unwrap_or_else(|_| panic!("Unable to parse node at line {line_no}")),
                 nums.next()
-                    .expect(&format!("Node missing at line {line_no}"))
+                    .unwrap_or_else(|| panic!("Node missing at line {line_no}"))
                     .parse::<usize>()
-                    .expect(&format!("Unable to parse node at line {line_no}")),
+                    .unwrap_or_else(|_| panic!("Unable to parse node at line {line_no}")),
             )
         })
         .collect();
