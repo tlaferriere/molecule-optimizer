@@ -20,14 +20,30 @@ struct Cli {
 fn main() {
     let cli = Cli::parse();
     let (t, n_atoms, h, edges) = read_prob(cli.example);
-    println!("t = {t}, n_atoms = {n_atoms:?}, h = {h:?}, edges = {edges:#?}")
-    // let mut graph = vec![vec![]; t];
-    // for (n1, n2) in edges {
-    //     let connected_nodes = &mut graph[n1];
-    //     connected_nodes.push(n2);
-    // }
-    // let mut init_sol: Vec<Option<usize>> = vec![None; t];
-    // for (atom, node) in zip(init_sol, graph) {}
+    // println!("t = {t}, n_atoms = {n_atoms:?}, h = {h:?}, edges = {edges:#?}")
+
+    // Create graph representation
+    let mut graph = vec![vec![]; t];
+    for (n1, n2) in edges {
+        let connected_nodes = &mut graph[n1];
+        connected_nodes.push(n2);
+    }
+
+    // List atom pairs sorted by energy
+    let mut atom_pairs = vec![];
+    for i in 0..n_atoms.len() {
+        for j in 0..n_atoms.len() {
+            atom_pairs.push((i, j))
+        }
+    }
+    atom_pairs.sort_by(|a, b| (&h[a.0 * n_atoms.len() + a.1]).cmp(&h[b.0 * n_atoms.len() + b.1]));
+
+    let mut init_sol: Vec<Option<usize>> = vec![None; t];
+    let mut atom_pools = n_atoms.clone();
+    for (atom, node) in zip(init_sol, graph) {
+        atom_pairs.iter()
+        for n in node {}
+    }
 }
 
 /// Read problem description
